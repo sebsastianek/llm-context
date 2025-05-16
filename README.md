@@ -1,6 +1,6 @@
-# LLM Context Generator (`llmcontext`)
+# LLM Context Extractor (`llmcontext`)
 
-`llmcontext` is a Python command-line tool that recursively scans a specified directory, aggregates the content of its files, and formats this content for easy input into Large Language Models (LLMs). It intelligently ignores files and directories based on rules found in `.gitignore` and `.llmignore` files within the project structure.
+`llmcontext` is a Python command-line tool that recursively scans a specified directory, aggregates the content of its files, and formats this content for easy input into Large Language Models (LLMs). It ignores files and directories based on rules found in `.gitignore` and `.llmignore` files within the project structure.
 
 This tool is useful for creating a comprehensive snapshot of a codebase or project that can then be fed to an LLM for analysis, summarization, code understanding, or other AI-driven tasks.
 
