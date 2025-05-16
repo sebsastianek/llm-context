@@ -41,7 +41,7 @@ This tool is useful for creating a comprehensive snapshot of a codebase or proje
     # pip install pathspec
     ```
 
-3.  **Make the Script Executable (Recommended):**
+3.  **Make the Script Executable:**
     Navigate to the directory where you saved `llmcontext.py` and run:
     ```bash
     chmod +x llmcontext.py
