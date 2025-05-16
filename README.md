@@ -209,4 +209,4 @@ Contributions are welcome! If you have suggestions for improvements or find any 
 
 ## License
 
-This project is open-source and available under the [MIT License](LICENSE.txt). (You would need to add a `LICENSE.txt` file with the MIT License text if you choose this license).
+This project is open-source and available under the [MIT License].
