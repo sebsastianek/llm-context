@@ -28,8 +28,8 @@ This tool is useful for creating a comprehensive snapshot of a codebase or proje
 1.  **Clone the repository or download `llmcontext.py`:**
     ```bash
     # If you have git installed
-    git clone [https://github.com/yourusername/llmcontext.git](https://github.com/yourusername/llmcontext.git)
-    cd llmcontext
+    git clone https://github.com/sebsastianek/llm-context.git
+    cd llm-context
     # Or, simply download the llmcontext.py file into a directory.
     ```
 
