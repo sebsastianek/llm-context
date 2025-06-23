@@ -57,19 +57,64 @@ def load_ignore_patterns(root_dir: Path, verbose: bool = False) -> pathspec.Path
         if pattern_line.startswith('/'):
             # A leading slash means the pattern is relative to the directory containing the ignore file.
             # For pathspec, which matches relative to root_dir, we prepend the path_prefix.
+            # Example: /foo.txt from root/A/.gitignore -> A/foo.txt
             final_pattern = (path_prefix / pattern_line.lstrip('/')).as_posix()
-        else:
-            # No leading slash means the pattern can match at any level.
-            # However, git matches relative to the ignore file's dir.
-            # For pathspec, we need to make it relative to root_dir.
-            # If the pattern is like `*.log` from `root/subdir/.gitignore`, it means `root/subdir/*.log`.
-            # So, `path_prefix / pattern_line` is correct.
+        elif '/' in pattern_line:
+            # Contains a slash, but doesn't start with one. Relative to the ignore file's directory.
+            # Example: build/output from root/A/.gitignore -> A/build/output
             final_pattern = (path_prefix / pattern_line).as_posix()
+        else:
+            # No slashes at all (e.g., "*.log", "tempfile").
+            # These patterns match in the current directory and subdirectories thereof.
+            if not path_prefix.parts:  # Empty path_prefix means ignore file is in root_dir
+                # Example: *.log from root/.gitignore -> *.log (matches globally)
+                final_pattern = pattern_line
+            else:
+                # Example: *.log from root/A/.gitignore -> A/**/*.log
+                # This makes it match 'A/file.log' and 'A/subdir/file.log' etc.
+            # The as_posix() ensures forward slashes. The `replace` handles cases like `A//*.log` if path_prefix was empty (though caught by `if not path_prefix.parts`).
+            current_prefix_str = path_prefix.as_posix()
+            if current_prefix_str == ".": # Path(".").as_posix() is "."
+                current_prefix_str = "" # Avoid "./**/*.log"
 
-        # Normalize pattern (e.g. remove './', handle '..') and ensure forward slashes
-        final_pattern = os.path.normpath(final_pattern).replace(os.sep, '/')
-        if final_pattern == '.':  # Skip patterns that normalize to nothing (e.g. './')
+            if current_prefix_str:
+                final_pattern = f"{current_prefix_str}/**/{pattern_line}"
+            else: # Should be covered by `if not path_prefix.parts` already, but as a safeguard
+                final_pattern = pattern_line # Effectively `**/{pattern_line}` if pathspec implies root
+
+        # General normalization and ensuring POSIX slashes
+        # Pathlib's construction (`/`) and `as_posix()` already handle most slash normalization.
+        # `os.path.normpath` can be tricky as it might use backslashes on Windows or alter `**`.
+        # We primarily need to ensure forward slashes and handle trivial cases like './'.
+
+        # Convert to string and ensure forward slashes, as PathSpec expects POSIX-style paths.
+        # This was `final_pattern = os.path.normpath(final_pattern).replace(os.sep, '/')`
+        # Let's simplify: Path objects internally manage normalization to some extent.
+        # The construction above should result in POSIX paths due to .as_posix() and f-string.
+        # If `final_pattern` is already a string (e.g. from `pattern_line` itself), ensure it's POSIX.
+        final_pattern = str(final_pattern).replace(os.sep, '/')
+
+        # Remove './' from the beginning of a pattern, if it exists, as it's mostly redundant for pathspec matching.
+        # e.g. "./foo/bar" -> "foo/bar"
+        if final_pattern.startswith('./'):
+            final_pattern = final_pattern[2:]
+
+        # Preserve trailing slash if original pattern had it (for directories) and it got lost
+        if pattern_line.endswith('/') and not final_pattern.endswith('/') and final_pattern: # final_pattern can be empty if original was './'
+            final_pattern += '/'
+
+        # Skip patterns that normalize to nothing or just a slash (e.g. './' or '/')
+        # A pattern like "/" from root usually means "ignore files/dirs in root only", not everything.
+        # However, pathspec might interpret "/" as matching everything if not careful.
+        # The original code had `if final_pattern == '.': continue`. Let's refine this.
+        # An empty pattern or a pattern that is just "/" (unless intended for root contents) is problematic.
+        if not final_pattern or final_pattern == '.':
             continue
+
+        # If a pattern was originally just "/", from a nested ignore file like "A//",
+        # it would become "A/" (correctly). From root, it would be "/".
+        # Pathspec treats "/" as "match files and directories at the root".
+        # This is usually fine.
 
         final_pat_list.append(final_pattern)
         if verbose:
