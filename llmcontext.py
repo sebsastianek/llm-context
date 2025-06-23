@@ -130,24 +130,24 @@ def load_ignore_patterns(root_dir: Path, verbose: bool = False) -> pathspec.Path
     return pathspec.PathSpec.from_lines('gitwildmatch', final_pat_list)
 
 
-def should_ignore(path_to_check: Path, root_directory: Path, spec: pathspec.PathSpec, verbose: bool = False) -> bool:
+def should_ignore(path_to_check: Path, spec_root_dir: Path, spec: pathspec.PathSpec, verbose: bool = False) -> bool:
     """
     Check if a given path should be ignored based on the loaded PathSpec.
     path_to_check should be an absolute path.
-    root_directory is the absolute path against which patterns were made relative.
+    spec_root_dir is the absolute path against which patterns in spec were made relative.
     """
     try:
         # Ensure both paths are absolute for reliable relative_to comparison
         abs_path_to_check = path_to_check.resolve()
-        abs_root_directory = root_directory.resolve()
+        abs_spec_root_dir = spec_root_dir.resolve()
 
-        # The path given to pathspec must be relative to the root_directory
-        relative_path = abs_path_to_check.relative_to(abs_root_directory)
+        # The path given to pathspec must be relative to the spec_root_dir
+        relative_path = abs_path_to_check.relative_to(abs_spec_root_dir)
     except ValueError:
-        # This can happen if path_to_check is not under root_directory.
-        # Such paths are outside the scope of the current scan based on root_directory.
+        # This can happen if path_to_check is not under spec_root_dir.
+        # Such paths are outside the scope of the current ignore patterns.
         if verbose:
-            print(f"  Path {abs_path_to_check} is outside scan root {abs_root_directory}, not checking for ignore.")
+            print(f"  Path {abs_path_to_check} is outside spec root {abs_spec_root_dir}, not checking for ignore.")
         return False
 
         # Convert the relative path to a string with POSIX-style forward slashes, as gitignore patterns expect
@@ -161,51 +161,68 @@ def should_ignore(path_to_check: Path, root_directory: Path, spec: pathspec.Path
 
     is_ignored = spec.match_file(path_str)
     if verbose and is_ignored:
+        # Show path relative to the parent of the spec_root_dir for possibly cleaner verbose output
+        # or relative to spec_root_dir itself.
+        try:
+            display_path_origin = abs_path_to_check.relative_to(abs_spec_root_dir.parent)
+        except ValueError:
+            display_path_origin = abs_path_to_check # fallback to absolute
         print(
-            f"  Path '{path_str}' (from {abs_path_to_check.relative_to(abs_root_directory.parent)}) matched ignore patterns.")
+            f"  Path '{path_str}' (from {display_path_origin}) matched ignore patterns relative to {abs_spec_root_dir}.")
     return is_ignored
 
 
-def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpec, verbose: bool = False):
+def process_directory(
+    content_scan_dir: Path,
+    output_file: Path,
+    spec: pathspec.PathSpec,
+    spec_root_dir: Path,
+    verbose: bool = False
+):
     """
-    Recursively processes files in the directory using os.walk for better ignore handling.
-    Writes content to the output_file.
+    Recursively processes files in content_scan_dir using os.walk.
+    Ignore patterns in spec are relative to spec_root_dir.
+    Writes content to output_file.
     """
     collected_content = []
-    root_dir_abs = directory.resolve()  # Absolute path of the directory to scan
+    # content_scan_dir_abs is the root for os.walk and for making header paths relative for output
+    content_scan_dir_abs = content_scan_dir.resolve()
 
     # os.walk yields (dirpath, dirnames, filenames)
     # dirpath is a string, path to the current directory
     # dirnames is a list of names of subdirectories in dirpath
     # filenames is a list of names of non-directory files in dirpath
-    for dirpath_str, dirnames, filenames in os.walk(str(root_dir_abs), topdown=True):
+    # os.walk starts from content_scan_dir_abs
+    for dirpath_str, dirnames, filenames in os.walk(str(content_scan_dir_abs), topdown=True):
         current_dir_path_abs = Path(dirpath_str).resolve()
 
         # Filter out ignored directories from dirnames *in place* to prevent os.walk from descending
+        # Paths are checked against spec, which is relative to spec_root_dir
         original_dirnames = list(dirnames)  # Make a copy for iteration as we modify dirnames
         dirnames[:] = [
             d_name for d_name in original_dirnames
-            if not should_ignore((current_dir_path_abs / d_name), root_dir_abs, spec, verbose=verbose)
+            if not should_ignore((current_dir_path_abs / d_name), spec_root_dir, spec, verbose=verbose)
         ]
 
         if verbose:
             ignored_dirs_in_step = set(original_dirnames) - set(dirnames)
             if ignored_dirs_in_step:
                 for ignored_d in ignored_dirs_in_step:
-                    # Show path relative to the initial scan directory for clarity
-                    print(f"  Ignoring directory: {(current_dir_path_abs / ignored_d).relative_to(root_dir_abs)}")
+                    # Show path relative to the content_scan_dir_abs for clarity of what's being skipped in the walk
+                    print(f"  Ignoring directory during walk: {(current_dir_path_abs / ignored_d).relative_to(content_scan_dir_abs)}")
 
         for filename in filenames:
             file_path_abs = (current_dir_path_abs / filename).resolve()
 
             # Check if the file itself should be ignored
-            if should_ignore(file_path_abs, root_dir_abs, spec, verbose=verbose):
+            # Paths are checked against spec, which is relative to spec_root_dir
+            if should_ignore(file_path_abs, spec_root_dir, spec, verbose=verbose):
                 # Verbose message for ignoring file already printed by should_ignore if verbose
                 continue
 
             try:
-                # Path for the output file header, relative to the initial scan directory
-                relative_path_to_root = file_path_abs.relative_to(root_dir_abs).as_posix()
+                # Path for the output file header, relative to content_scan_dir_abs
+                relative_path_for_header = file_path_abs.relative_to(content_scan_dir_abs).as_posix()
                 try:
                     # Attempt to read as UTF-8. If it's binary or wrong encoding, skip with a message.
                     with file_path_abs.open('r', encoding='utf-8', errors='strict') as f:
@@ -213,19 +230,20 @@ def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpe
                 except UnicodeDecodeError:
                     content = "[Skipped: Binary or non-UTF-8 file]"
                     if verbose:
-                        print(f"  Skipping binary/non-UTF-8 file: {relative_path_to_root}")
+                        print(f"  Skipping binary/non-UTF-8 file: {relative_path_for_header}")
                 except Exception as e:  # Catch other read errors (e.g., permission denied)
                     content = f"[Error reading file: {e}]"
                     if verbose:
-                        print(f"  Error reading file {relative_path_to_root}: {e}")
+                        print(f"  Error reading file {relative_path_for_header}: {e}")
 
-                collected_content.append(f"--{relative_path_to_root}--\n{content}\n\n")
+                collected_content.append(f"--{relative_path_for_header}--\n{content}\n\n")
             except Exception as e:
                 # This outer exception is for critical errors like path resolution issues
                 if verbose:
                     print(f"Critical error processing file metadata for {file_path_abs}: {e}")
                 try:
-                    rel_path_on_error = file_path_abs.relative_to(root_dir_abs).as_posix()
+                    # Fallback relative path for header in case of error
+                    rel_path_on_error = file_path_abs.relative_to(content_scan_dir_abs).as_posix()
                 except:  # Fallback if relative path itself fails
                     rel_path_on_error = str(file_path_abs)
                 collected_content.append(f"--{rel_path_on_error}--\n[Error processing file meta: {e}]\n\n")
@@ -270,7 +288,105 @@ def main():
     args = parser.parse_args()
 
     # Resolve input directory to an absolute path for consistency
-    input_dir = Path(args.directory).resolve()
+    input_dir_abs = Path(args.directory).resolve()
+
+    # Determine the root directory for scanning ignore files
+    # This can be different from input_dir_abs, especially if args.directory is relative.
+    scan_root_for_ignores: Path
+    original_input_path = Path(args.directory)
+
+    if original_input_path.is_absolute():
+        scan_root_for_ignores = input_dir_abs
+        if args.verbose:
+            print(f"Input path is absolute. Ignore patterns will be loaded from: {scan_root_for_ignores} downwards.")
+    else:
+        cwd = Path.cwd()
+        scan_root_for_ignores = find_project_root_for_ignores(cwd, verbose=args.verbose)
+        if args.verbose:
+            print(f"Input path is relative. Current directory: {cwd}")
+            print(f"Effective project root for ignores: {scan_root_for_ignores}")
+            print(f"Actual content scan will be within: {input_dir_abs}")
+
+
+def find_project_root_for_ignores(start_dir: Path, verbose: bool = False) -> Path:
+    """
+    Traverses upwards from start_dir to find a project root for ignore scanning.
+    A project root is identified by a .git directory.
+    If no .git directory is found up to the filesystem root, start_dir itself is returned.
+    """
+    current_path = start_dir.resolve()
+    # Default to start_dir if no .git found. This is a conservative choice.
+    project_root_candidate = current_path
+
+    while True:
+        if (current_path / ".git").is_dir():
+            project_root_candidate = current_path
+            if verbose:
+                print(f"Found .git directory at: {project_root_candidate}. Using as ignore scan root.")
+            break
+
+        parent = current_path.parent
+        if parent == current_path:  # Reached filesystem root
+            if verbose:
+                # If .git wasn't found, project_root_candidate remains start_dir.
+                print(f"Reached filesystem root. No .git directory found above {start_dir}. "
+                      f"Using {project_root_candidate} as ignore scan root.")
+            break
+        current_path = parent
+    return project_root_candidate
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Recursively scans a directory, reads file contents, and formats them for LLM analysis. "
+                    "Obeys .gitignore and .llmignore rules. Output includes file paths as headers.",
+        formatter_class=argparse.RawTextHelpFormatter  # Allows for better formatting of help text
+    )
+    parser.add_argument(
+        "directory",
+        type=str,
+        nargs='?',  # Makes the argument optional
+        default='.',  # Default to current directory if not provided
+        help="The target directory to scan (e.g., /path/to/project).\n"
+             "If not specified, defaults to the current working directory."
+    )
+    parser.add_argument(
+        "output_file",
+        type=str,
+        nargs='?',  # Makes the argument optional
+        default='llmcontext.txt',  # Default output filename
+        help="The file to write the aggregated content to (e.g., project_context.txt).\n"
+             "If not specified, defaults to 'llmcontext.txt' in the current working directory."
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output, showing ignored files/directories and other diagnostic information."
+    )
+
+    args = parser.parse_args()
+
+    # Resolve input directory to an absolute path for consistency
+    input_dir_abs = Path(args.directory).resolve()
+
+    # Determine the root directory for scanning ignore files
+    # This can be different from input_dir_abs, especially if args.directory is relative.
+    scan_root_for_ignores: Path
+    original_input_path = Path(args.directory)
+
+    if original_input_path.is_absolute():
+        scan_root_for_ignores = input_dir_abs
+        if args.verbose:
+            print(f"Input path is absolute. Ignore patterns will be loaded from: {scan_root_for_ignores} downwards.")
+    else:
+        cwd = Path.cwd()
+        scan_root_for_ignores = find_project_root_for_ignores(cwd, verbose=args.verbose)
+        if args.verbose:
+            print(f"Input path is relative. Current directory: {cwd}")
+            print(f"Effective project root for ignores: {scan_root_for_ignores}")
+            print(f"Actual content scan will be within: {input_dir_abs}")
+
 
     # Determine output file path. If not absolute, make it relative to current working directory.
     output_f = Path(args.output_file)
@@ -278,13 +394,16 @@ def main():
         output_f = Path.cwd() / output_f
     output_f = output_f.resolve()  # Ensure output path is absolute as well
 
-    if not input_dir.is_dir():
+    if not input_dir_abs.is_dir():
         print(
-            f"Error: Input directory '{args.directory}' (resolved to '{input_dir}') does not exist or is not a directory.")
+            f"Error: Input directory '{args.directory}' (resolved to '{input_dir_abs}') does not exist or is not a directory.")
         return
 
     print(f"Starting LLM Context Generator...")
-    print(f"Scanning directory: {input_dir}")
+    # The actual directory to be walked for content
+    print(f"Target directory for content processing: {input_dir_abs}")
+    # The root from which .gitignore/.llmignore files are searched and patterns made relative to
+    print(f"Root for ignore pattern scanning: {scan_root_for_ignores}")
 
     # Warn if output file exists, as it will be overwritten.
     if output_f.exists():
@@ -295,10 +414,13 @@ def main():
         print("Verbose mode enabled.")
 
     # Load ignore patterns from .gitignore and .llmignore files
-    ignore_spec = load_ignore_patterns(input_dir, verbose=args.verbose)
+    # Patterns are loaded relative to scan_root_for_ignores
+    ignore_spec = load_ignore_patterns(scan_root_for_ignores, verbose=args.verbose)
 
     # Process the directory and generate the output
-    process_directory(input_dir, output_f, ignore_spec, verbose=args.verbose)
+    # Content is read from input_dir_abs
+    # The spec is applied against paths relative to scan_root_for_ignores
+    process_directory(input_dir_abs, output_f, ignore_spec, scan_root_for_ignores, verbose=args.verbose)
 
 
 if __name__ == "__main__":
