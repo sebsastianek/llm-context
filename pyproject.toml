@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llmcontext"
+version = "0.2.0"
+description = "A tool to extract and format file contents for LLMs, respecting .gitignore and .llmignore."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT License"}
+dependencies = [
+    "pathspec>=0.12.1"
+]
+
+[project.urls]
+Homepage = "https://github.com/sebsastianek/llm-context"
+
+[project.scripts]
+llmcontext = "llmcontext:main"

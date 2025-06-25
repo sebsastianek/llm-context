@@ -20,71 +20,80 @@ This tool is useful for creating a comprehensive snapshot of a codebase or proje
 
 ## Prerequisites
 
--   **Python 3.6+**
--   **pip** (Python package installer)
+-   **Python 3.9+**
+-   **uv** (Python package and project manager). You can install `uv` by following the instructions at [https://astral.sh/uv#installation](https://astral.sh/uv#installation). For example:
+    ```bash
+    # On macOS and Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # On Windows (PowerShell)
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    ```
+    Alternatively, you can install it via pip: `pip install uv`.
 
 ## Installation
 
-1.  **Clone the repository or download `llmcontext.py`:**
+1.  **Clone the repository:**
     ```bash
-    # If you have git installed
     git clone https://github.com/sebsastianek/llm-context.git
     cd llm-context
-    # Or, simply download the llmcontext.py file into a directory.
     ```
 
-2.  **Install Dependencies:**
-    This script relies on the `pathspec` library for parsing `.gitignore`-style patterns. Install it using pip:
+2.  **Create a virtual environment and install dependencies using `uv`:**
+    This command will create a virtual environment (usually `.venv/`) if it doesn't exist and install the dependencies specified in `pyproject.toml` (including `pathspec`).
     ```bash
-    pip3 install pathspec
-    # or if pip is aliased to pip3
-    # pip install pathspec
+    uv sync
     ```
+    This also generates a `uv.lock` file which ensures reproducible installations. It's recommended to commit `uv.lock` to your repository.
 
-3.  **Make the Script Executable:**
-    Navigate to the directory where you saved `llmcontext.py` and run:
+3.  **Activate the virtual environment (Optional but recommended for direct script execution):**
+    To run the script directly or use development tools, activate the environment:
     ```bash
-    chmod +x llmcontext.py
+    # On macOS and Linux
+    source .venv/bin/activate
+    # On Windows (PowerShell)
+    .venv\Scripts\Activate.ps1
+    # On Windows (CMD)
+    .venv\Scripts\activate.bat
     ```
-
-4.  **Add to PATH (Optional, for global access):**
-    To run `llmcontext` from any directory without specifying its full path, you can move it to a directory in your system's PATH or add its current directory to your PATH.
-
-    * **Option A: Move to a common PATH directory (e.g., `/usr/local/bin`):**
-        ```bash
-        sudo mv llmcontext.py /usr/local/bin/llmcontext
-        ```
-        (You can choose a different name like `llmcontext` for the command.)
-
-    * **Option B: Add a custom directory (e.g., `~/bin`) to PATH:**
-        Create a `bin` directory in your home folder if it doesn't exist:
-        ```bash
-        mkdir -p ~/bin
-        ```
-        Move the script:
-        ```bash
-        mv llmcontext.py ~/bin/llmcontext
-        ```
-        Add `~/bin` to your PATH. Edit your shell's configuration file (e.g., `~/.zshrc` for Zsh, `~/.bashrc` or `~/.bash_profile` for Bash):
-        ```bash
-        echo 'export PATH="$HOME/bin:$PATH"' >> ~/.your_shell_rc_file
-        # Example for Zsh: echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
-        ```
-        Then, source the file or open a new terminal window:
-        ```bash
-        source ~/.your_shell_rc_file
-        ```
+    Once activated, `llmcontext.py` can be made executable (`chmod +x llmcontext.py`) and run directly if desired.
 
 ## Usage
 
-Once installed and executable (and optionally in your PATH), you can run the script from your terminal.
+There are several ways to run `llmcontext`:
 
-**Basic Syntax:**
+1.  **Using `uv run` (Recommended):**
+    This command runs the `llmcontext` script (defined in `pyproject.toml`) within the `uv`-managed environment without needing to activate it first.
+    ```bash
+    uv run llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+    ```
+    For example:
+    ```bash
+    uv run llmcontext . my_project_dump.txt --verbose
+    ```
+
+2.  **Directly, after activating the environment:**
+    If you have activated the virtual environment (see step 3 in Installation):
+    ```bash
+    # Make it executable first (if not done)
+    # chmod +x llmcontext.py
+
+    ./llmcontext.py [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+    # or simply, if . is in your PATH or using the script alias
+    llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+    ```
+
+3.  **Using `python -m` (after activating the environment):**
+    This is another way to run the script if the environment is activated:
+    ```bash
+    python -m llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+    ```
+    *(Note: This requires `llmcontext.py` to be structured or invoked in a way that `python -m llmcontext` works, typically if `llmcontext.py` is part of a package or the current directory is treated as the top-level for the module.)*
+    Given our `pyproject.toml` specifies `llmcontext = "llmcontext:main"`, `uv run llmcontext` is the most straightforward. For direct execution, `python llmcontext.py ...` or `./llmcontext.py ...` (after `chmod +x`) are common when the environment is active. The `project.scripts` entry mainly benefits `uv run` and tool installation.
+
+**Basic Syntax (using `uv run`):**
 
 ```bash
-./llmcontext.py [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
-# or if in PATH:
-llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+uv run llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
 ```
 
 **Arguments:**

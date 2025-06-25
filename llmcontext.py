@@ -69,18 +69,20 @@ def load_ignore_patterns(root_dir: Path, verbose: bool = False) -> pathspec.Path
             if not path_prefix.parts:  # Empty path_prefix means ignore file is in root_dir
                 # Example: *.log from root/.gitignore -> *.log (matches globally)
                 final_pattern = pattern_line
-            else:
-                # Example: *.log from root/A/.gitignore -> A/**/*.log
+            else:  # Pattern from a subdirectory's ignore file, e.g. root/A/.gitignore wants to ignore *.log
                 # This makes it match 'A/file.log' and 'A/subdir/file.log' etc.
-            # The as_posix() ensures forward slashes. The `replace` handles cases like `A//*.log` if path_prefix was empty (though caught by `if not path_prefix.parts`).
-            current_prefix_str = path_prefix.as_posix()
-            if current_prefix_str == ".": # Path(".").as_posix() is "."
-                current_prefix_str = "" # Avoid "./**/*.log"
+                # The pattern needs to be anchored to the path of the ignore file's directory,
+                # and then apply globbing within that scope.
+                # Example: *.log from root/A/.gitignore -> A/**/*.log
+                current_prefix_str = path_prefix.as_posix()
+                if current_prefix_str == ".": # Path(".").as_posix() is "."
+                    current_prefix_str = "" # Avoid "./**/*.log"
 
-            if current_prefix_str:
-                final_pattern = f"{current_prefix_str}/**/{pattern_line}"
-            else: # Should be covered by `if not path_prefix.parts` already, but as a safeguard
-                final_pattern = pattern_line # Effectively `**/{pattern_line}` if pathspec implies root
+                if current_prefix_str:
+                    final_pattern = f"{current_prefix_str}/**/{pattern_line}"
+                else: # This case implies path_prefix was effectively root, though logic for that is above.
+                      # This is a safeguard. If path_prefix.parts is true, current_prefix_str should not be empty unless it was ".".
+                    final_pattern = f"**/{pattern_line}" # Effectively `**/{pattern_line}` if pathspec implies root, same as if from root .gitignore
 
         # General normalization and ensuring POSIX slashes
         # Pathlib's construction (`/`) and `as_posix()` already handle most slash normalization.
