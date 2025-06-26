@@ -1,0 +1,19 @@
+This file contains unicode characters: 
+🚀 Rocket emoji
+🐍 Python snake
+📁 Folder icon
+🔧 Wrench tool
+
+Unicode text in different languages:
+English: Hello World
+Spanish: Hola Mundo  
+French: Bonjour le Monde
+German: Hallo Welt
+Japanese: こんにちは世界
+Chinese: 你好世界
+Russian: Привет мир
+Arabic: مرحبا بالعالم
+
+Special characters: àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ
+
+Mathematical symbols: ∑∏∫∞≠≤≥±×÷√∂∆∇

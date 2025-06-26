@@ -1,0 +1,26 @@
+# LLM-specific ignore patterns
+# These files are not relevant for LLM code analysis
+
+# Large data files
+*.csv
+*.json
+data/
+datasets/
+
+# Documentation that's not code-relevant
+docs/internal/
+INTERNAL_NOTES.md
+
+# Test data
+test_data/
+sample_data/
+
+# Binary model files
+*.pkl
+*.model
+*.weights
+
+# Sensitive or internal files
+secrets/
+.env.local
+config.private.json

@@ -1,0 +1,9 @@
+This is a sample data file.
+It contains some text for testing purposes.
+
+Line 1: Hello
+Line 2: World  
+Line 3: Testing llmcontext tool
+
+Numbers:
+1, 2, 3, 4, 5

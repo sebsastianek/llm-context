@@ -1,0 +1,14 @@
+{
+  "app_name": "Simple Project",
+  "version": "1.0.0",
+  "debug": true,
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "simple_db"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "app.log"
+  }
+}

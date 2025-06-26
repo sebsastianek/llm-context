@@ -1,0 +1,4 @@
+# Test-specific ignores
+*.coverage
+.tox/
+test_outputs/

@@ -25,55 +25,56 @@ This tool is useful for creating a comprehensive snapshot of a codebase or proje
 
 ## Installation
 
-1.  **Clone the repository or download `llmcontext.py`:**
+### Global Installation (Recommended)
+
+Install `llmcontext` globally using pip or uv:
+
+**Using pip:**
+```bash
+pip install llmcontext
+```
+
+**Using uv (faster):**
+```bash
+uv tool install llmcontext
+```
+
+### Local Development Installation
+
+1.  **Clone the repository:**
     ```bash
-    # If you have git installed
-    git clone [https://github.com/yourusername/llmcontext.git](https://github.com/yourusername/llmcontext.git)
+    git clone https://github.com/yourusername/llmcontext.git
     cd llmcontext
-    # Or, simply download the llmcontext.py file into a directory.
     ```
 
-2.  **Install Dependencies:**
-    This script relies on the `pathspec` library for parsing `.gitignore`-style patterns. Install it using pip:
+2.  **Install in development mode:**
     ```bash
-    pip3 install pathspec
-    # or if pip is aliased to pip3
-    # pip install pathspec
+    # Using pip
+    pip install -e .
+    
+    # Using uv
+    uv pip install -e .
     ```
 
-3.  **Make the Script Executable (Recommended):**
-    Navigate to the directory where you saved `llmcontext.py` and run:
+### Manual Installation (Alternative)
+
+If you prefer to install manually:
+
+1.  **Download the source code and install dependencies:**
+    ```bash
+    pip install pathspec
+    ```
+
+2.  **Make the script executable:**
     ```bash
     chmod +x llmcontext.py
     ```
 
-4.  **Add to PATH (Optional, for global access):**
-    To run `llmcontext` from any directory without specifying its full path, you can move it to a directory in your system's PATH or add its current directory to your PATH.
-
-    * **Option A: Move to a common PATH directory (e.g., `/usr/local/bin`):**
-        ```bash
-        sudo mv llmcontext.py /usr/local/bin/llmcontext
-        ```
-        (You can choose a different name like `llmcontext` for the command.)
-
-    * **Option B: Add a custom directory (e.g., `~/bin`) to PATH:**
-        Create a `bin` directory in your home folder if it doesn't exist:
-        ```bash
-        mkdir -p ~/bin
-        ```
-        Move the script:
-        ```bash
-        mv llmcontext.py ~/bin/llmcontext
-        ```
-        Add `~/bin` to your PATH. Edit your shell's configuration file (e.g., `~/.zshrc` for Zsh, `~/.bashrc` or `~/.bash_profile` for Bash):
-        ```bash
-        echo 'export PATH="$HOME/bin:$PATH"' >> ~/.your_shell_rc_file
-        # Example for Zsh: echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
-        ```
-        Then, source the file or open a new terminal window:
-        ```bash
-        source ~/.your_shell_rc_file
-        ```
+3.  **Add to PATH for global access:**
+    ```bash
+    # Move to a directory in your PATH
+    sudo mv llmcontext.py /usr/local/bin/llmcontext
+    ```
 
 ## Usage
 
@@ -82,17 +83,15 @@ Once installed and executable (and optionally in your PATH), you can run the scr
 **Basic Syntax:**
 
 ```bash
-./llmcontext.py [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
-# or if in PATH:
-llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
+llmcontext [DIRECTORIES...] [-o OUTPUT_FILE] [--verbose]
 ```
 
 **Arguments:**
 
--   `TARGET_DIRECTORY` (optional):
-    -   The directory you want to scan.
+-   `DIRECTORIES` (optional):
+    -   One or more directories you want to scan (e.g., `dir1 dir2 dir3`).
     -   If not provided, defaults to the **current working directory** (`.`).
--   `OUTPUT_FILE` (optional):
+-   `-o, --output OUTPUT_FILE` (optional):
     -   The name of the file where the aggregated content will be saved.
     -   If not provided, defaults to `llmcontext.txt` in the **current working directory**.
 -   `--verbose` or `-v` (optional):
@@ -104,26 +103,34 @@ llmcontext [TARGET_DIRECTORY] [OUTPUT_FILE] [--verbose]
     ```bash
     llmcontext
     ```
-    *(If not in PATH, use `./llmcontext.py`)*
 
-2.  **Scan a specific project directory and output to `llmcontext.txt`:**
+2.  **Scan a specific project directory:**
     ```bash
     llmcontext /path/to/your/project
     ```
 
-3.  **Scan the current directory and output to a custom file named `my_project_dump.txt`:**
+3.  **Scan multiple directories:**
     ```bash
-    llmcontext . my_project_dump.txt
+    llmcontext /path/to/project1 /path/to/project2 /path/to/project3
     ```
 
-4.  **Scan a specific project directory and output to a custom file:**
+4.  **Scan with custom output file:**
     ```bash
-    llmcontext /path/to/your/project /tmp/project_for_ai.txt
+    llmcontext /path/to/your/project -o my_project_dump.txt
+    # or using the long form:
+    llmcontext /path/to/your/project --output my_project_dump.txt
     ```
 
-5.  **Scan with verbose output:**
+5.  **Scan multiple directories with custom output:**
+    ```bash
+    llmcontext dir1 dir2 dir3 -o combined_output.txt
+    ```
+
+6.  **Scan with verbose output:**
     ```bash
     llmcontext --verbose /path/to/your/project
+    # or combine with other options:
+    llmcontext dir1 dir2 -o output.txt --verbose
     ```
 
 ## How `.llmignore` Works

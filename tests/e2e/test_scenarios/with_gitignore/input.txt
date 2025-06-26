@@ -1,0 +1,6 @@
+hello world
+python testing
+llmcontext tool
+data processing
+file handling
+ignore patterns

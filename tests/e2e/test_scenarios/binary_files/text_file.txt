@@ -1,0 +1,9 @@
+This is a regular text file that should be processed normally.
+It contains readable UTF-8 content.
+
+Multiple lines of text:
+- Line 1
+- Line 2  
+- Line 3
+
+End of file.

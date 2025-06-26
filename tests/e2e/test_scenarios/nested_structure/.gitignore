@@ -1,0 +1,9 @@
+# Nested project gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Test outputs
+test_reports/
+coverage/
