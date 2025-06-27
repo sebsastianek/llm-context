@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "A Python tool that recursively scans directories and formats file contents for LLM analysis"
 readme = "README.md"
 requires-python = ">=3.6"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "LLMContext Contributors"}
 ]
@@ -42,7 +42,7 @@ Issues = "https://github.com/yourusername/llmcontext/issues"
 llmcontext = "llmcontext:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["llmcontext.py"]
+packages = ["."]
 
 [tool.hatch.build.targets.sdist]
 include = [

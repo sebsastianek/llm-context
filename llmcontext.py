@@ -121,10 +121,10 @@ def should_ignore(path_to_check: Path, root_directory: Path, spec: pathspec.Path
     return is_ignored
 
 
-def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpec, verbose: bool = False):
+def process_directory_content(directory: Path, spec: pathspec.PathSpec, verbose: bool = False):
     """
     Recursively processes files in the directory using os.walk for better ignore handling.
-    Writes content to the output_file.
+    Returns content as a list of strings.
     """
     collected_content = []
     root_dir_abs = directory.resolve()  # Absolute path of the directory to scan
@@ -185,6 +185,16 @@ def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpe
                     rel_path_on_error = str(file_path_abs)
                 collected_content.append(f"--{rel_path_on_error}--\n[Error processing file meta: {e}]\n\n")
 
+    return collected_content
+
+
+def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpec, verbose: bool = False):
+    """
+    Recursively processes files in the directory using os.walk for better ignore handling.
+    Writes content to the output_file. (Legacy function for backward compatibility)
+    """
+    collected_content = process_directory_content(directory, spec, verbose)
+    
     try:
         with output_file.open('w', encoding='utf-8') as f:
             f.writelines(collected_content)  # More efficient for list of strings
@@ -195,22 +205,21 @@ def process_directory(directory: Path, output_file: Path, spec: pathspec.PathSpe
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Recursively scans a directory, reads file contents, and formats them for LLM analysis. "
+        description="Recursively scans one or more directories, reads file contents, and formats them for LLM analysis. "
                     "Obeys .gitignore and .llmignore rules. Output includes file paths as headers.",
         formatter_class=argparse.RawTextHelpFormatter  # Allows for better formatting of help text
     )
     parser.add_argument(
-        "directory",
+        "directories",
         type=str,
-        nargs='?',  # Makes the argument optional
-        default='.',  # Default to current directory if not provided
-        help="The target directory to scan (e.g., /path/to/project).\n"
+        nargs='*',  # Accept zero or more directories
+        default=['.'],  # Default to current directory if not provided
+        help="The target directories to scan (e.g., /path/to/project1 /path/to/project2).\n"
              "If not specified, defaults to the current working directory."
     )
     parser.add_argument(
-        "output_file",
+        "-o", "--output",
         type=str,
-        nargs='?',  # Makes the argument optional
         default='llmcontext.txt',  # Default output filename
         help="The file to write the aggregated content to (e.g., project_context.txt).\n"
              "If not specified, defaults to 'llmcontext.txt' in the current working directory."
@@ -224,22 +233,32 @@ def main():
 
     args = parser.parse_args()
 
-    # Resolve input directory to an absolute path for consistency
-    input_dir = Path(args.directory).resolve()
+    # Handle default case when no directories are provided
+    if not args.directories:
+        args.directories = ['.']
+
+    # Resolve input directories to absolute paths for consistency
+    input_dirs = []
+    for directory in args.directories:
+        input_dir = Path(directory).resolve()
+        if not input_dir.is_dir():
+            print(f"Error: Input directory '{directory}' (resolved to '{input_dir}') does not exist or is not a directory.")
+            return
+        input_dirs.append(input_dir)
 
     # Determine output file path. If not absolute, make it relative to current working directory.
-    output_f = Path(args.output_file)
+    output_f = Path(args.output)
     if not output_f.is_absolute():
         output_f = Path.cwd() / output_f
     output_f = output_f.resolve()  # Ensure output path is absolute as well
 
-    if not input_dir.is_dir():
-        print(
-            f"Error: Input directory '{args.directory}' (resolved to '{input_dir}') does not exist or is not a directory.")
-        return
-
     print(f"Starting LLM Context Generator...")
-    print(f"Scanning directory: {input_dir}")
+    if len(input_dirs) == 1:
+        print(f"Scanning directory: {input_dirs[0]}")
+    else:
+        print(f"Scanning {len(input_dirs)} directories:")
+        for input_dir in input_dirs:
+            print(f"  - {input_dir}")
 
     # Warn if output file exists, as it will be overwritten.
     if output_f.exists():
@@ -249,11 +268,31 @@ def main():
     if args.verbose:
         print("Verbose mode enabled.")
 
-    # Load ignore patterns from .gitignore and .llmignore files
-    ignore_spec = load_ignore_patterns(input_dir, verbose=args.verbose)
+    # Process all directories and generate the output
+    collected_content = []
+    for input_dir in input_dirs:
+        if args.verbose:
+            print(f"\nProcessing directory: {input_dir}")
+        
+        # Load ignore patterns from .gitignore and .llmignore files for this directory
+        ignore_spec = load_ignore_patterns(input_dir, verbose=args.verbose)
+        
+        # Process the directory and collect content
+        dir_content = process_directory_content(input_dir, ignore_spec, verbose=args.verbose)
+        if len(input_dirs) > 1:
+            # Add a section header when processing multiple directories
+            collected_content.append(f"=== Directory: {input_dir} ===\n\n")
+        collected_content.extend(dir_content)
+        if len(input_dirs) > 1:
+            collected_content.append(f"\n=== End of {input_dir} ===\n\n")
 
-    # Process the directory and generate the output
-    process_directory(input_dir, output_f, ignore_spec, verbose=args.verbose)
+    # Write all collected content to the output file
+    try:
+        with output_f.open('w', encoding='utf-8') as f:
+            f.writelines(collected_content)
+        print(f"Successfully processed {len(input_dirs)} director{'y' if len(input_dirs) == 1 else 'ies'}. Output written to {output_f.resolve()}")
+    except IOError as e:
+        print(f"Error: Could not write to output file {output_f.resolve()}: {e}")
 
 
 if __name__ == "__main__":
