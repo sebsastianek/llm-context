@@ -1,0 +1,3 @@
+# utils level .gitignore - deepest level
+*.log
+!debug.log

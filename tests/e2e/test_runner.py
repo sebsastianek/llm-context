@@ -315,6 +315,87 @@ class TestMultipleDirectories(LLMContextE2ETest):
         self.assertIn("Successfully processed 2 directories", stdout)
 
 
+class TestNestedIgnoreFiles(LLMContextE2ETest):
+    """Test comprehensive nested .gitignore and .llmignore functionality"""
+    
+    def test_nested_ignore_precedence(self):
+        """Test that nested ignore files override parent ignore files"""
+        input_dir = self.scenarios_dir / "nested_ignore_complex"
+        output_file = self.temp_dir / "nested_ignore_output.txt"
+        
+        return_code, stdout, stderr = self.run_llmcontext(input_dir, output_file, verbose=True)
+        
+        self.assertEqual(return_code, 0, f"Command failed: {stderr}")
+        
+        output_content = self.read_output_file(output_file)
+        
+        # Files that should be INCLUDED
+        self.assert_file_in_output(output_content, "main.py")
+        self.assert_file_in_output(output_content, "src/app.py")
+        self.assert_file_in_output(output_content, "src/utils/helpers.py")
+        self.assert_file_in_output(output_content, "important.log")  # negated by root .gitignore
+        self.assert_file_in_output(output_content, "src/debug.log")  # negated by src .gitignore
+        self.assert_file_in_output(output_content, "src/internal.md")  # negated by src .llmignore
+        self.assert_file_in_output(output_content, "src/utils/debug.log")  # negated by utils .gitignore
+        self.assert_file_in_output(output_content, "src/utils/deep/config.secret")  # leading slash in src only affects src level
+        
+        # Files that should be IGNORED
+        self.assert_file_not_in_output(output_content, "debug.log")  # ignored by root *.log
+        self.assert_file_not_in_output(output_content, "config.secret")  # ignored by root /config.secret
+        self.assert_file_not_in_output(output_content, "data.backup")  # ignored by root *.backup
+        self.assert_file_not_in_output(output_content, "internal.md")  # ignored by root .llmignore
+        self.assert_file_not_in_output(output_content, "temp/temp_file.txt")  # temp/ dir ignored
+        self.assert_file_not_in_output(output_content, "build/output.exe")  # build/ dir ignored
+        self.assert_file_not_in_output(output_content, "private/secret.txt")  # private/ dir ignored by .llmignore
+        self.assert_file_not_in_output(output_content, "src/test_utils.py")  # ignored by src test_*.py
+        self.assert_file_not_in_output(output_content, "src/config.secret")  # ignored by src /config.secret
+        self.assert_file_not_in_output(output_content, "src/old_data.backup")  # ignored by src *.backup
+        self.assert_file_not_in_output(output_content, "src/utils/error.log")  # ignored by utils *.log (no negation)
+    
+    def test_gitignore_and_llmignore_interaction(self):
+        """Test that .gitignore and .llmignore patterns work together"""
+        input_dir = self.scenarios_dir / "nested_ignore_complex"
+        output_file = self.temp_dir / "ignore_interaction_output.txt"
+        
+        return_code, stdout, stderr = self.run_llmcontext(input_dir, output_file, verbose=True)
+        
+        self.assertEqual(return_code, 0, f"Command failed: {stderr}")
+        
+        output_content = self.read_output_file(output_file)
+        
+        # Check that .gitignore patterns work
+        self.assert_file_not_in_output(output_content, "debug.log")  # root .gitignore *.log
+        self.assert_file_in_output(output_content, "important.log")  # root .gitignore !important.log
+        
+        # Check that .llmignore patterns work
+        self.assert_file_not_in_output(output_content, "data.backup")  # root .llmignore *.backup
+        self.assert_file_not_in_output(output_content, "internal.md")  # root .llmignore internal.md
+        
+        # Check that patterns from both files are respected at same level
+        self.assert_file_not_in_output(output_content, "src/old_data.backup")  # src .llmignore *.backup
+        self.assert_file_in_output(output_content, "src/internal.md")  # src .llmignore !internal.md
+    
+    def test_leading_slash_patterns(self):
+        """Test that leading slash patterns work correctly in nested contexts"""
+        input_dir = self.scenarios_dir / "nested_ignore_complex"
+        output_file = self.temp_dir / "leading_slash_output.txt"
+        
+        return_code, stdout, stderr = self.run_llmcontext(input_dir, output_file, verbose=True)
+        
+        self.assertEqual(return_code, 0, f"Command failed: {stderr}")
+        
+        output_content = self.read_output_file(output_file)
+        
+        # Root /config.secret should ignore only at root level
+        self.assert_file_not_in_output(output_content, "config.secret")  # ignored at root
+        
+        # src /config.secret should ignore only at src level
+        self.assert_file_not_in_output(output_content, "src/config.secret")  # ignored at src level
+        
+        # But config.secret in deeper subdirectory should NOT be ignored by src's /config.secret
+        self.assert_file_in_output(output_content, "src/utils/deep/config.secret")  # NOT ignored
+
+
 class TestNewCLIInterface(LLMContextE2ETest):
     """Test the new CLI interface specifically"""
     
@@ -359,6 +440,7 @@ def run_all_tests():
         TestGitignoreHandling,
         TestLLMIgnoreHandling,
         TestNestedStructure,
+        TestNestedIgnoreFiles,
         TestBinaryFileHandling,
         TestVerboseMode,
         TestMultipleDirectories,

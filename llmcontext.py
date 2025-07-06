@@ -53,28 +53,56 @@ def load_ignore_patterns(root_dir: Path, verbose: bool = False) -> pathspec.Path
         # Make the pattern relative to root_dir for pathspec matching
         # path_prefix is the path from root_dir to the directory containing the ignore file
         path_prefix = source_dir.relative_to(root_dir) if source_dir.is_relative_to(root_dir) else Path()
+        
+        # Handle negation patterns (starting with !)
+        is_negation = pattern_line.startswith('!')
+        if is_negation:
+            pattern_line = pattern_line[1:]  # Remove the ! prefix
 
         if pattern_line.startswith('/'):
             # A leading slash means the pattern is relative to the directory containing the ignore file.
-            # For pathspec, which matches relative to root_dir, we prepend the path_prefix.
-            final_pattern = (path_prefix / pattern_line.lstrip('/')).as_posix()
+            # For pathspec, we need to make it an absolute path within the scope.
+            pattern_without_slash = pattern_line.lstrip('/')
+            if path_prefix == Path():
+                # Root level - make it an absolute pattern from root
+                final_pattern = '/' + pattern_without_slash
+            else:
+                # Nested level - make it absolute within the nested directory's scope
+                final_pattern = '/' + (path_prefix / pattern_without_slash).as_posix()
         else:
-            # No leading slash means the pattern can match at any level.
-            # However, git matches relative to the ignore file's dir.
-            # For pathspec, we need to make it relative to root_dir.
-            # If the pattern is like `*.log` from `root/subdir/.gitignore`, it means `root/subdir/*.log`.
-            # So, `path_prefix / pattern_line` is correct.
-            final_pattern = (path_prefix / pattern_line).as_posix()
+            # No leading slash means the pattern can match at any level within the ignore file's directory.
+            # For nested ignore files, we need to scope the pattern to that directory and its subdirectories.
+            if path_prefix == Path():
+                # Root level ignore file - pattern applies globally
+                final_pattern = pattern_line
+            else:
+                # Nested ignore file - pattern should apply within the directory and its subdirectories
+                # Handle directory patterns (ending with /) vs file patterns
+                if pattern_line.endswith('/'):
+                    # Directory pattern - match exactly within the scope
+                    final_pattern = (path_prefix / pattern_line).as_posix()
+                else:
+                    # File pattern - match within the directory and all subdirectories
+                    final_pattern = (path_prefix / "**" / pattern_line).as_posix()
 
         # Normalize pattern (e.g. remove './', handle '..') and ensure forward slashes
+        # But preserve directory patterns' trailing slashes
+        preserve_trailing_slash = final_pattern.endswith('/')
         final_pattern = os.path.normpath(final_pattern).replace(os.sep, '/')
+        if preserve_trailing_slash and not final_pattern.endswith('/'):
+            final_pattern += '/'
+            
         if final_pattern == '.':  # Skip patterns that normalize to nothing (e.g. './')
             continue
+
+        # Re-add the negation prefix if this was a negation pattern
+        if is_negation:
+            final_pattern = '!' + final_pattern
 
         final_pat_list.append(final_pattern)
         if verbose:
             print(
-                f"  Loaded pattern: '{pattern_line}' from {source_dir.relative_to(root_dir.parent)} -> effective as: '{final_pattern}'")
+                f"  Loaded pattern: '{'!' if is_negation else ''}{pattern_line}' from {source_dir.relative_to(root_dir.parent)} -> effective as: '{final_pattern}'")
 
     if verbose and not final_pat_list:
         print("No custom ignore patterns found or loaded from .gitignore or .llmignore files.")

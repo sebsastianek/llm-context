@@ -1,0 +1,6 @@
+# Root level .gitignore
+*.log
+temp/
+build/
+/config.secret
+!important.log

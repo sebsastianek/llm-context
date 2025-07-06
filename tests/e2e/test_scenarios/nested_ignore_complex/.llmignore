@@ -1,0 +1,4 @@
+# Root level .llmignore
+*.backup
+private/
+internal.md

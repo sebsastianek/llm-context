@@ -1,0 +1,4 @@
+# src level .gitignore - should override root patterns
+!*.log
+test_*.py
+/config.secret

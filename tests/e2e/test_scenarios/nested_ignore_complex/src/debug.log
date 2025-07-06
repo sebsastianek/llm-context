@@ -1,0 +1,1 @@
+DEBUG: This log in src/ should be INCLUDED due to src/.gitignore !*.log pattern overriding root *.log

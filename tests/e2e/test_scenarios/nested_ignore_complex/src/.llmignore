@@ -1,0 +1,3 @@
+# src level .llmignore
+!internal.md
+*.backup
